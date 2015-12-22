@@ -38,8 +38,7 @@ func (w *messageWriter) writeMessage(m *Message) {
 		w.openMultipart("alternative")
 	}
 	for _, part := range m.parts {
-		w.writeHeaders(part.header)
-		w.writeBody(part.copier, m.encoding)
+		w.writePart(part, m.charset)
 	}
 	if m.hasAlternativePart() {
 		w.closeMultipart()
@@ -104,6 +103,14 @@ func (w *messageWriter) closeMultipart() {
 	}
 }
 
+func (w *messageWriter) writePart(p *part, charset string) {
+	w.writeHeaders(map[string][]string{
+		"Content-Type":              {p.contentType + "; charset=" + charset},
+		"Content-Transfer-Encoding": {string(p.encoding)},
+	})
+	w.writeBody(p.copier, p.encoding)
+}
+
 func (w *messageWriter) addFiles(files []*file, isAttachment bool) {
 	for _, f := range files {
 		if _, ok := f.Header["Content-Type"]; !ok {
@@ -154,23 +161,16 @@ func (w *messageWriter) writeString(s string) {
 	w.n += int64(n)
 }
 
-func (w *messageWriter) writeStrings(a []string, sep string) {
-	if len(a) > 0 {
-		w.writeString(a[0])
-		if len(a) == 1 {
-			return
-		}
-	}
-	for _, s := range a[1:] {
-		w.writeString(sep)
-		w.writeString(s)
-	}
-}
-
 func (w *messageWriter) writeHeader(k string, v ...string) {
 	w.writeString(k)
 	w.writeString(": ")
-	w.writeStrings(v, ", ")
+	if len(v) > 0 {
+		w.writeString(v[0])
+		for _, s := range v[1:] {
+			w.writeString(", ")
+			w.writeString(s)
+		}
+	}
 	w.writeString("\r\n")
 }
 
